@@ -5,7 +5,7 @@ import { io } from 'socket.io-client';
 const ICE_SERVERS = {
   iceServers: [
     {
-      urls: 'stun:openrelay.metered.ca:80',
+      urls: 'stun.voipplanet.nl:3478',
     }
   ],
 };
@@ -42,6 +42,7 @@ const Room = () => {
     socketRef.current.on('connect', () => {
       console.log('Connected to socket server with ID:', socketRef.current.id);
       socketRef.current.emit('join', roomName);
+      socketRef.current.emit('messages', roomName)
     });
 
     socketRef.current.on('joined', handleRoomJoined);
