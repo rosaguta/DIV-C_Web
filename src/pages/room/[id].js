@@ -4,10 +4,9 @@ import { io } from 'socket.io-client';
 
 const ICE_SERVERS = {
   iceServers: [
-    {
-      urls: 'stun.voipplanet.nl:3478',
-    }
+    { urls: 'stun:stun.solcon.nl:3478' }
   ],
+  iceCandidatePoolSize: 10,
 };
 
 const Room = () => {
