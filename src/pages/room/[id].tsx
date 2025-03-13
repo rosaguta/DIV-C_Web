@@ -31,6 +31,7 @@ const Room = () => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const socketRef = useRef<any>(null);
+  const socketChatRef = useRef<any>(null);
   const peerConnectionsRef = useRef<PeerConnection[]>([]);
   const isRoomCreatorRef = useRef(false);
   
@@ -44,7 +45,15 @@ const Room = () => {
       transports: ['websocket'],
       forceNew: true
     });
-
+    socketChatRef.current = io('http://localhost:4001',{
+      transports:['websocket']
+    })
+    socketChatRef.current.on('connect',()=>{
+      socketChatRef.current.emit('join', roomName)
+      socketChatRef.current.emit('messages', roomName)
+    })
+    socketChatRef.current.on('message', handleChatMessage)
+    
     console.log('Connecting to socket server...');
 
     socketRef.current.on('connect', () => {
@@ -376,16 +385,6 @@ const Room = () => {
     }
   };
 
-  const sendChat = (event) => {
-    event.preventDefault();
-    console.log("Sending message:", input);
-    socketRef.current.emit('message', input, roomName);
-    setInput("");
-  };
-
-  const handleInputChange = (e) => {
-    setInput(e.target.value);
-  };
 
   const toggleMediaStream = (type, state) => {
     if (localStreamRef.current) {
@@ -429,7 +428,7 @@ const Room = () => {
     peerConnectionsRef.current = [];
     
     // Navigate back to home
-    router.push('/');
+    // router.push('/');
   };
 
   return (
@@ -457,8 +456,9 @@ const Room = () => {
       <div className="chat-container">
         <h3>Chat</h3>
         <div className="chat-messages">
-          {chat.map((msg, index) => (
-            <p key={index}>{msg}</p>
+          {chat.map((msg, index) => (<div>
+            <strong key={index}>{msg.clientId}</strong> :{msg.text}
+          </div>
           ))}
         </div>
         <form className="chat-input" onSubmit={sendChat}>
@@ -508,7 +508,6 @@ const Room = () => {
         video {
           width: 100%;
           height: 100%;
-          object-fit: cover;
           background-color: #222;
         }
         .video-label {
