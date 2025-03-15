@@ -26,7 +26,8 @@ const Room = () => {
   const [chat, setChat] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [participants, setParticipants] = useState<Participant[]>([]);
-  
+  const [isChatConnected, setIsChatConnected] = useState(false)
+  const [isCallConnected, setIsCallConnected] = useState(false)
   const router = useRouter();
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -34,7 +35,7 @@ const Room = () => {
   const socketChatRef = useRef<any>(null);
   const peerConnectionsRef = useRef<PeerConnection[]>([]);
   const isRoomCreatorRef = useRef(false);
-  
+
   const { id: roomName } = router.query;
 
   useEffect(() => {
@@ -45,18 +46,22 @@ const Room = () => {
       transports: ['websocket'],
       forceNew: true
     });
-    socketChatRef.current = io('http://localhost:4001',{
-      transports:['websocket']
+    socketChatRef.current = io('http://localhost:4001', {
+      transports: ['websocket'],
+      forceNew: true
     })
-    socketChatRef.current.on('connect',()=>{
+    
+    socketChatRef.current.on('connect', () => {
+      setIsChatConnected(true)
       socketChatRef.current.emit('join', roomName)
       socketChatRef.current.emit('messages', roomName)
     })
     socketChatRef.current.on('message', handleChatMessage)
-    
+
     console.log('Connecting to socket server...');
 
     socketRef.current.on('connect', () => {
+      setIsCallConnected(true)
       console.log('Connected to socket server with ID:', socketRef.current.id);
       socketRef.current.emit('join', roomName);
       socketRef.current.emit('messages', roomName);
@@ -80,12 +85,17 @@ const Room = () => {
     socketRef.current.on('answer', handleAnswer);
     socketRef.current.on('ice-candidate', handleIceCandidate);
 
+    const checkConnection = setInterval(() => {
+      if (socketRef.current) setIsCallConnected(socketRef.current.connected);
+      if (socketChatRef.current) setIsChatConnected(socketChatRef.current.connected);
+    }, 5000);
+
     return () => {
-      // Cleanup function
+      clearInterval(checkConnection)
       leaveRoom();
     };
   }, [roomName]);
-
+  
   // Setup local video when component mounts
   useEffect(() => {
     if (localVideoRef.current && localStreamRef.current) {
@@ -121,7 +131,7 @@ const Room = () => {
 
   const handleUserJoined = (user) => {
     console.log(`User joined: ${user.username || user.id}`);
-    
+
     // Add new participant to state (without stream yet)
     setParticipants(prev => {
       if (prev.find(p => p.id === user.id)) return prev;
@@ -141,7 +151,7 @@ const Room = () => {
 
   const handleUserLeft = (userId) => {
     console.log(`User left: ${userId}`);
-    
+
     // Clean up peer connection
     const connectionIndex = peerConnectionsRef.current.findIndex(pc => pc.peerId === userId);
     if (connectionIndex !== -1) {
@@ -149,10 +159,10 @@ const Room = () => {
       connection.ontrack = null;
       connection.onicecandidate = null;
       connection.close();
-      
+
       peerConnectionsRef.current.splice(connectionIndex, 1);
     }
-    
+
     // Remove from participants list
     setParticipants(prev => prev.filter(p => p.id !== userId));
   };
@@ -171,24 +181,24 @@ const Room = () => {
       .then((stream) => {
         console.log('Media access granted');
         localStreamRef.current = stream;
-        
+
         // Add local user to participants
         const localParticipant: Participant = {
           id: socketRef.current.id,
           username: `You`,
           stream: stream
         };
-        
+
         setParticipants(prev => {
           if (prev.find(p => p.id === socketRef.current.id)) return prev;
           return [...prev, localParticipant];
         });
-        
+
         // Update local video
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
-        
+
         // Signal that we're ready to connect
         socketRef.current.emit('ready', roomName);
       })
@@ -200,29 +210,29 @@ const Room = () => {
 
   const createPeerConnection = (peerId) => {
     console.log(`Creating peer connection with ${peerId}`);
-    
+
     // Check if we already have a connection to this peer
     const existingConnection = peerConnectionsRef.current.find(pc => pc.peerId === peerId);
     if (existingConnection) {
       console.log(`Connection to ${peerId} already exists`);
       return existingConnection.connection;
     }
-    
+
     const peerConnection = new RTCPeerConnection(ICE_SERVERS);
-    
+
     // Add this connection to our ref array
     peerConnectionsRef.current.push({
       peerId,
       connection: peerConnection
     });
-    
+
     // Add our local stream tracks to the connection
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStreamRef.current);
       });
     }
-    
+
     // Set up ICE candidate handling
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
@@ -233,26 +243,26 @@ const Room = () => {
         }, roomName);
       }
     };
-    
+
     // Handle incoming tracks
     peerConnection.ontrack = (event) => {
       console.log(`Received tracks from ${peerId}`);
-      
+
       setParticipants(prev => {
         const updatedParticipants = [...prev];
         const participantIndex = updatedParticipants.findIndex(p => p.id === peerId);
-        
+
         if (participantIndex !== -1) {
           updatedParticipants[participantIndex] = {
             ...updatedParticipants[participantIndex],
             stream: event.streams[0]
           };
         }
-        
+
         return updatedParticipants;
       });
     };
-    
+
     // Create and send offer if we're initiating the connection
     peerConnection
       .createOffer()
@@ -269,29 +279,29 @@ const Room = () => {
       .catch(err => {
         console.error('Error creating offer:', err);
       });
-    
+
     return peerConnection;
   };
 
   const handleReceivedOffer = ({ offer, from }) => {
     console.log(`Received offer from ${from}`);
-    
+
     // Create peer connection if it doesn't exist
     const peerConnection = new RTCPeerConnection(ICE_SERVERS);
-    
+
     // Save the connection
     peerConnectionsRef.current.push({
       peerId: from,
       connection: peerConnection
     });
-    
+
     // Add local tracks
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStreamRef.current);
       });
     }
-    
+
     // ICE candidate handling
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
@@ -301,15 +311,15 @@ const Room = () => {
         }, roomName);
       }
     };
-    
+
     // Track handling
     peerConnection.ontrack = (event) => {
       console.log(`Received tracks from ${from}`);
-      
+
       setParticipants(prev => {
         const updatedParticipants = [...prev];
         const participantIndex = updatedParticipants.findIndex(p => p.id === from);
-        
+
         if (participantIndex !== -1) {
           updatedParticipants[participantIndex] = {
             ...updatedParticipants[participantIndex],
@@ -323,11 +333,11 @@ const Room = () => {
             stream: event.streams[0]
           });
         }
-        
+
         return updatedParticipants;
       });
     };
-    
+
     // Set remote description (the offer)
     peerConnection
       .setRemoteDescription(new RTCSessionDescription(offer))
@@ -353,10 +363,10 @@ const Room = () => {
 
   const handleAnswer = ({ answer, from }) => {
     console.log(`Received answer from ${from}`);
-    
+
     // Find the appropriate peer connection
     const peerConnection = peerConnectionsRef.current.find(pc => pc.peerId === from)?.connection;
-    
+
     if (peerConnection) {
       peerConnection
         .setRemoteDescription(new RTCSessionDescription(answer))
@@ -370,10 +380,10 @@ const Room = () => {
 
   const handleIceCandidate = ({ candidate, from }) => {
     console.log(`Received ICE candidate from ${from}`);
-    
+
     // Find the appropriate peer connection
     const peerConnection = peerConnectionsRef.current.find(pc => pc.peerId === from)?.connection;
-    
+
     if (peerConnection) {
       peerConnection
         .addIceCandidate(new RTCIceCandidate(candidate))
@@ -424,16 +434,16 @@ const Room = () => {
       connection.onicecandidate = null;
       connection.close();
     });
-    
+
     peerConnectionsRef.current = [];
-    
+
     // Navigate back to home
     // router.push('/');
   };
   const sendChat = (event) => {
     event.preventDefault();
     console.log("Sending message:", input);
-    socketRef.current.emit('message', input, roomName);
+    socketChatRef.current.emit('message', input, roomName);
     setInput("");
   };
 
@@ -442,37 +452,66 @@ const Room = () => {
   };
 
   return (
-    <div className="video-room">
-      <div className="video-grid">
-        {participants.map(participant => (
-          <div key={participant.id} className="video-box">
-            {participant.id === socketRef.current?.id ? (
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted={true}
-              />
-            ) : (
-              <VideoPlayer stream={participant.stream} />
-            )}
-            <div className="video-label">
-              {participant.id === socketRef.current?.id ? 'You' : participant.username}
+    <div className='main-room'>
+      <div className="video-room">
+        <div className="video-grid">
+          {isCallConnected ? (
+            <div>
+              {participants.map(participant => (
+                <div key={participant.id} className="video-box">
+                  {participant.id === socketRef.current?.id ? (
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted={true}
+                    />
+                  ) : (
+                    <VideoPlayer stream={participant.stream} />
+                  )}
+                  <div className="video-label">
+                    {participant.id === socketRef.current?.id ? 'You' : participant.username}
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        ))}
+          ) : (
+            <p className="error-label">no call connection</p>
+          )}
+
+        </div>
+        <div className="controls">
+          <button onClick={toggleMic} type="button" className="control-btn">
+            {micActive ? 'Mute' : 'Unmute'}
+          </button>
+          <button onClick={toggleCamera} type="button" className="control-btn">
+            {cameraActive ? 'Stop Video' : 'Start Video'}
+          </button>
+          <button onClick={leaveRoom} type="button" className="control-btn leave-btn">
+            Leave
+          </button>
+        </div>
+
+
       </div>
       <div className="chat-sidebar">
         <div className="chat-header">
           <h3>Chat</h3>
         </div>
         <div className="chat-messages">
-          {chat.map((msg, index) => (
-            <div key={index} className="chat-message">
-              <span className="sender-name">{msg.clientId}</span>
-              <p>{msg.text}</p>
+          {isChatConnected ? (
+            <div>
+              {chat.map((msg, index) => (
+                <div key={index} className="chat-message">
+                  <span className="sender-name">{msg.clientId}</span>
+                  <p>{msg.text}</p>
+                </div>
+              ))}
             </div>
-          ))}
+          ) : (
+            <p className='error-label'>no chat connection</p>
+          )}
+
         </div>
         <form className="chat-input" onSubmit={sendChat}>
           <input
@@ -483,19 +522,15 @@ const Room = () => {
           <button type="submit">Send</button>
         </form>
       </div>
-      <div className="controls">
-        <button onClick={toggleMic} type="button" className="control-btn">
-          {micActive ? 'Mute' : 'Unmute'}
-        </button>
-        <button onClick={toggleCamera} type="button" className="control-btn">
-          {cameraActive ? 'Stop Video' : 'Start Video'}
-        </button>
-        <button onClick={leaveRoom} type="button" className="control-btn leave-btn">
-          Leave
-        </button>
-      </div>
       <style jsx>{`
+        .main-room {
+          display: flex;
+          width: 100vw
+          height: 100vh
+          
+        }
         .video-room {
+          flex: 2
           display: flex;
           flex-direction: column;
           height: 100vh;
@@ -503,8 +538,8 @@ const Room = () => {
           color: white;
           position: relative;
           overflow: hidden;
-          width: 75%
-        }
+          width: 100%
+          }
         
         .video-grid {
           display: grid;
@@ -516,7 +551,6 @@ const Room = () => {
           height: calc(100vh - 80px);
           overflow-y: auto;
         }
-        
         .video-box {
           position: relative;
           border-radius: 8px;
@@ -545,18 +579,14 @@ const Room = () => {
         }
         
         .chat-sidebar {
-          position: absolute;
-          right: 0;
-          top: 0;
+          overflow: scroll
+          flex: 1
           width: 320px;
-          height: 100%;
+          height: 100vh;
           background-color: #2d2d2d;
           border-left: 1px solid #3a3a3a;
           display: flex;
           flex-direction: column;
-          transform: translateX(100%);
-          transition: transform 0.3s ease;
-          z-index: 10;
         }
         
         .chat-sidebar.open {
@@ -627,7 +657,7 @@ const Room = () => {
         }
         
         .controls {
-          position: absolute;
+          position: relative;
           bottom: 0;
           left: 0;
           width: 100%;
@@ -667,7 +697,10 @@ const Room = () => {
         .leave-btn:hover {
           background-color: #c42323;
         }
-        
+        .error-label{
+          font-weight: 500;
+          color: red
+        }
         /* Add a media query for responsive design */
         @media (max-width: 768px) {
           .video-grid {
@@ -691,13 +724,13 @@ const Room = () => {
 // Helper component to display video
 const VideoPlayer = ({ stream }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  
+
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
     }
   }, [stream]);
-  
+
   return <video ref={videoRef} autoPlay playsInline />;
 };
 
