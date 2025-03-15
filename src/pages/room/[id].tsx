@@ -430,6 +430,16 @@ const Room = () => {
     // Navigate back to home
     // router.push('/');
   };
+  const sendChat = (event) => {
+    event.preventDefault();
+    console.log("Sending message:", input);
+    socketRef.current.emit('message', input, roomName);
+    setInput("");
+  };
+
+  const handleInputChange = (e) => {
+    setInput(e.target.value);
+  };
 
   return (
     <div className="video-room">
@@ -452,119 +462,231 @@ const Room = () => {
           </div>
         ))}
       </div>
-      
-      <div className="chat-container">
-        <h3>Chat</h3>
+      <div className="chat-sidebar">
+        <div className="chat-header">
+          <h3>Chat</h3>
+        </div>
         <div className="chat-messages">
-          {chat.map((msg, index) => (<div>
-            <strong key={index}>{msg.clientId}</strong> :{msg.text}
-          </div>
+          {chat.map((msg, index) => (
+            <div key={index} className="chat-message">
+              <span className="sender-name">{msg.clientId}</span>
+              <p>{msg.text}</p>
+            </div>
           ))}
         </div>
         <form className="chat-input" onSubmit={sendChat}>
-          <input 
+          <input
             value={input}
             onChange={handleInputChange}
-            placeholder="Type a message..." 
+            placeholder="Type a message..."
           />
           <button type="submit">Send</button>
         </form>
       </div>
-      
       <div className="controls">
         <button onClick={toggleMic} type="button" className="control-btn">
-          {micActive ? 'Mute Mic' : 'UnMute Mic'}
+          {micActive ? 'Mute' : 'Unmute'}
         </button>
         <button onClick={toggleCamera} type="button" className="control-btn">
-          {cameraActive ? 'Stop Camera' : 'Start Camera'}
+          {cameraActive ? 'Stop Video' : 'Start Video'}
         </button>
         <button onClick={leaveRoom} type="button" className="control-btn leave-btn">
-          Leave Room
+          Leave
         </button>
       </div>
-
       <style jsx>{`
         .video-room {
           display: flex;
           flex-direction: column;
-          align-items: center;
-          padding: 20px;
           height: 100vh;
+          background-color: #1a1a1a;
+          color: white;
+          position: relative;
+          overflow: hidden;
+          width: 75%
         }
+        
         .video-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-          gap: 20px;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          grid-auto-rows: 1fr;
+          gap: 8px;
+          padding: 48px 16px 100px 16px;
           width: 100%;
-          margin-bottom: 20px;
+          height: calc(100vh - 80px);
+          overflow-y: auto;
         }
+        
         .video-box {
           position: relative;
-          aspect-ratio: 4/3;
-          border: 1px solid #ccc;
           border-radius: 8px;
           overflow: hidden;
+          background-color: #2d2d2d;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          aspect-ratio: 16/9;
         }
+        
         video {
           width: 100%;
           height: 100%;
-          background-color: #222;
+          object-fit: cover;
+          background-color: #3a3a3a;
         }
+        
         .video-label {
           position: absolute;
           bottom: 10px;
           left: 10px;
-          background-color: rgba(0,0,0,0.5);
+          background-color: rgba(0, 0, 0, 0.5);
           color: white;
-          padding: 5px 10px;
+          padding: 4px 8px;
           border-radius: 4px;
+          font-size: 14px;
         }
-        .chat-container {
-          width: 100%;
-          max-width: 600px;
-          border: 1px solid #ccc;
-          border-radius: 8px;
-          padding: 10px;
-          margin-bottom: 20px;
-        }
-        .chat-messages {
-          height: 200px;
-          overflow-y: auto;
-          margin-bottom: 10px;
-          padding: 10px;
-          background-color: #f5f5f5;
-          border-radius: 4px;
-          color:black 
-        }
-        .chat-input {
+        
+        .chat-sidebar {
+          position: absolute;
+          right: 0;
+          top: 0;
+          width: 320px;
+          height: 100%;
+          background-color: #2d2d2d;
+          border-left: 1px solid #3a3a3a;
           display: flex;
-          gap: 10px;
+          flex-direction: column;
+          transform: translateX(100%);
+          transition: transform 0.3s ease;
+          z-index: 10;
         }
+        
+        .chat-sidebar.open {
+          transform: translateX(0);
+        }
+        
+        .chat-header {
+          padding: 16px;
+          border-bottom: 1px solid #3a3a3a;
+        }
+        
+        .chat-header h3 {
+          margin: 0;
+          font-size: 16px;
+          font-weight: 500;
+        }
+        
+        .chat-messages {
+          flex: 1;
+          overflow-y: auto;
+          padding: 16px;
+        }
+        
+        .chat-message {
+          margin-bottom: 16px;
+        }
+        
+        .sender-name {
+          font-weight: 500;
+          font-size: 14px;
+          color: #2d8cff;
+          display: block;
+          margin-bottom: 4px;
+        }
+        
+        .chat-message p {
+          margin: 0;
+          background-color: #3a3a3a;
+          border-radius: 4px;
+          padding: 8px 12px;
+          font-size: 14px;
+          color: #f1f1f1;
+        }
+        
+        .chat-input {
+          padding: 16px;
+          border-top: 1px solid #3a3a3a;
+          display: flex;
+          gap: 8px;
+        }
+        
         .chat-input input {
           flex: 1;
-          padding: 8px;
-          border: 1px solid #ccc;
+          padding: 8px 12px;
+          border: 1px solid #3a3a3a;
           border-radius: 4px;
-        }
-        .controls {
-          display: flex;
-          gap: 15px;
-        }
-        .control-btn {
-          padding: 10px 20px;
-          border: none;
-          border-radius: 5px;
-          background-color: #4285f4;
+          background-color: #1a1a1a;
           color: white;
+        }
+        
+        .chat-input button {
+          padding: 8px 16px;
+          background-color: #2d8cff;
+          color: white;
+          border: none;
+          border-radius: 4px;
           cursor: pointer;
         }
+        
+        .controls {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          gap: 16px;
+          padding: 16px;
+          background-color: #1a1a1a;
+          border-top: 1px solid #3a3a3a;
+          z-index: 5;
+        }
+        
+        .control-btn {
+          padding: 10px 16px;
+          border: none;
+          border-radius: 8px;
+          background-color: #333333;
+          color: white;
+          font-weight: 500;
+          cursor: pointer;
+          min-width: 100px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          transition: background-color 0.2s;
+        }
+        
+        .control-btn:hover {
+          background-color: #444444;
+        }
+        
         .leave-btn {
-          background-color: #ea4335;
+          background-color: #e02d2d;
+        }
+        
+        .leave-btn:hover {
+          background-color: #c42323;
+        }
+        
+        /* Add a media query for responsive design */
+        @media (max-width: 768px) {
+          .video-grid {
+            grid-template-columns: 1fr;
+            padding-bottom: 120px;
+          }
+          
+          .chat-sidebar {
+            width: 100%;
+          }
+          
+          .controls {
+            flex-wrap: wrap;
+          }
         }
       `}</style>
     </div>
   );
-};
+}
 
 // Helper component to display video
 const VideoPlayer = ({ stream }) => {
