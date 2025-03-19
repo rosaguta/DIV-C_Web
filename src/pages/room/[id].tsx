@@ -20,10 +20,15 @@ type PeerConnection = {
   connection: RTCPeerConnection;
 }
 
+type ChatMessage = {
+  clientId: string;
+  text: string;
+}
+
 const Room = () => {
   const [micActive, setMicActive] = useState(true);
   const [cameraActive, setCameraActive] = useState(true);
-  const [chat, setChat] = useState<string[]>([]);
+  const [chat, setChat] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isChatConnected, setIsChatConnected] = useState(false)
@@ -538,7 +543,7 @@ const Room = () => {
         <div className="chat-messages">
           {isChatConnected ? (
             <div>
-              {chat.map((msg, index) => (
+              {chat.map((msg:ChatMessage, index) => (
                 <div key={index} className="chat-message">
                   <span className="sender-name">{msg.clientId}</span>
                   <p>{msg.text}</p>
