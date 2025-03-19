@@ -14,4 +14,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag harbor.divsphere.net/rose/div-c_web:$(date +%s)
+      run: docker build . --file Dockerfile --tag harbor.divsphere.net/rose/div-c_web:latest
+
+    - name: Login into harbor.divsphere.net
+      run: echo ${{ secret.HARBOR_PASSWORD }} | docker login -u  ${{secret.HARBOR_PASSWORD }} ---password-stdin harbor.divsphere.net
+
+    - name: push image
+      run: docker push harbor.divsphere.net/rose/div-c_web:latest
