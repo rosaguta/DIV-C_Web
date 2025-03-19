@@ -36,6 +36,7 @@ const Room = () => {
   const peerConnectionsRef = useRef<PeerConnection[]>([]);
   const isRoomCreatorRef = useRef(false);
 
+
   const { id: roomName } = router.query;
 
   useEffect(() => {
@@ -57,6 +58,7 @@ const Room = () => {
       socketChatRef.current.emit('messages', roomName)
     })
     socketChatRef.current.on('message', handleChatMessage)
+
 
     console.log('Connecting to socket server...');
 
@@ -132,6 +134,7 @@ const Room = () => {
   const handleUserJoined = (user) => {
     console.log(`User joined: ${user.username || user.id}`);
 
+
     // Add new participant to state (without stream yet)
     setParticipants(prev => {
       if (prev.find(p => p.id === user.id)) return prev;
@@ -152,6 +155,7 @@ const Room = () => {
   const handleUserLeft = (userId) => {
     console.log(`User left: ${userId}`);
 
+
     // Clean up peer connection
     const connectionIndex = peerConnectionsRef.current.findIndex(pc => pc.peerId === userId);
     if (connectionIndex !== -1) {
@@ -160,8 +164,10 @@ const Room = () => {
       connection.onicecandidate = null;
       connection.close();
 
+
       peerConnectionsRef.current.splice(connectionIndex, 1);
     }
+
 
     // Remove from participants list
     setParticipants(prev => prev.filter(p => p.id !== userId));
@@ -182,6 +188,7 @@ const Room = () => {
         console.log('Media access granted');
         localStreamRef.current = stream;
 
+
         // Add local user to participants
         const localParticipant: Participant = {
           id: socketRef.current.id,
@@ -189,15 +196,18 @@ const Room = () => {
           stream: stream
         };
 
+
         setParticipants(prev => {
           if (prev.find(p => p.id === socketRef.current.id)) return prev;
           return [...prev, localParticipant];
         });
 
+
         // Update local video
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
+
 
         // Signal that we're ready to connect
         socketRef.current.emit('ready', roomName);
@@ -211,6 +221,7 @@ const Room = () => {
   const createPeerConnection = (peerId) => {
     console.log(`Creating peer connection with ${peerId}`);
 
+
     // Check if we already have a connection to this peer
     const existingConnection = peerConnectionsRef.current.find(pc => pc.peerId === peerId);
     if (existingConnection) {
@@ -218,7 +229,9 @@ const Room = () => {
       return existingConnection.connection;
     }
 
+
     const peerConnection = new RTCPeerConnection(ICE_SERVERS);
+
 
     // Add this connection to our ref array
     peerConnectionsRef.current.push({
@@ -226,12 +239,14 @@ const Room = () => {
       connection: peerConnection
     });
 
+
     // Add our local stream tracks to the connection
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStreamRef.current);
       });
     }
+
 
     // Set up ICE candidate handling
     peerConnection.onicecandidate = (event) => {
@@ -244,13 +259,16 @@ const Room = () => {
       }
     };
 
+
     // Handle incoming tracks
     peerConnection.ontrack = (event) => {
       console.log(`Received tracks from ${peerId}`);
 
+
       setParticipants(prev => {
         const updatedParticipants = [...prev];
         const participantIndex = updatedParticipants.findIndex(p => p.id === peerId);
+
 
         if (participantIndex !== -1) {
           updatedParticipants[participantIndex] = {
@@ -259,9 +277,11 @@ const Room = () => {
           };
         }
 
+
         return updatedParticipants;
       });
     };
+
 
     // Create and send offer if we're initiating the connection
     peerConnection
@@ -280,14 +300,17 @@ const Room = () => {
         console.error('Error creating offer:', err);
       });
 
+
     return peerConnection;
   };
 
   const handleReceivedOffer = ({ offer, from }) => {
     console.log(`Received offer from ${from}`);
 
+
     // Create peer connection if it doesn't exist
     const peerConnection = new RTCPeerConnection(ICE_SERVERS);
+
 
     // Save the connection
     peerConnectionsRef.current.push({
@@ -295,12 +318,14 @@ const Room = () => {
       connection: peerConnection
     });
 
+
     // Add local tracks
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStreamRef.current);
       });
     }
+
 
     // ICE candidate handling
     peerConnection.onicecandidate = (event) => {
@@ -312,13 +337,16 @@ const Room = () => {
       }
     };
 
+
     // Track handling
     peerConnection.ontrack = (event) => {
       console.log(`Received tracks from ${from}`);
 
+
       setParticipants(prev => {
         const updatedParticipants = [...prev];
         const participantIndex = updatedParticipants.findIndex(p => p.id === from);
+
 
         if (participantIndex !== -1) {
           updatedParticipants[participantIndex] = {
@@ -334,9 +362,11 @@ const Room = () => {
           });
         }
 
+
         return updatedParticipants;
       });
     };
+
 
     // Set remote description (the offer)
     peerConnection
@@ -364,8 +394,10 @@ const Room = () => {
   const handleAnswer = ({ answer, from }) => {
     console.log(`Received answer from ${from}`);
 
+
     // Find the appropriate peer connection
     const peerConnection = peerConnectionsRef.current.find(pc => pc.peerId === from)?.connection;
+
 
     if (peerConnection) {
       peerConnection
@@ -381,8 +413,10 @@ const Room = () => {
   const handleIceCandidate = ({ candidate, from }) => {
     console.log(`Received ICE candidate from ${from}`);
 
+
     // Find the appropriate peer connection
     const peerConnection = peerConnectionsRef.current.find(pc => pc.peerId === from)?.connection;
+
 
     if (peerConnection) {
       peerConnection
@@ -435,7 +469,9 @@ const Room = () => {
       connection.close();
     });
 
+
     peerConnectionsRef.current = [];
+
 
     // Navigate back to home
     // router.push('/');
@@ -443,6 +479,7 @@ const Room = () => {
   const sendChat = (event) => {
     event.preventDefault();
     console.log("Sending message:", input);
+    socketChatRef.current.emit('message', input, roomName);
     socketChatRef.current.emit('message', input, roomName);
     setInput("");
   };
@@ -529,7 +566,14 @@ const Room = () => {
           height: 100vh
           
         }
+        .main-room {
+          display: flex;
+          width: 100vw
+          height: 100vh
+          
+        }
         .video-room {
+          flex: 2
           flex: 2
           display: flex;
           flex-direction: column;
@@ -538,6 +582,8 @@ const Room = () => {
           color: white;
           position: relative;
           overflow: hidden;
+          width: 100%
+          }
           width: 100%
           }
         
@@ -581,7 +627,10 @@ const Room = () => {
         .chat-sidebar {
           overflow: scroll
           flex: 1
+          overflow: scroll
+          flex: 1
           width: 320px;
+          height: 100vh;
           height: 100vh;
           background-color: #2d2d2d;
           border-left: 1px solid #3a3a3a;
@@ -658,6 +707,7 @@ const Room = () => {
         
         .controls {
           position: relative;
+          position: relative;
           bottom: 0;
           left: 0;
           width: 100%;
@@ -725,11 +775,13 @@ const Room = () => {
 const VideoPlayer = ({ stream }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
+
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
     }
   }, [stream]);
+
 
   return <video ref={videoRef} autoPlay playsInline />;
 };
