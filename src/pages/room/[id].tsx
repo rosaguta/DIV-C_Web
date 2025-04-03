@@ -48,11 +48,11 @@ const Room = () => {
     if (!roomName) return;
 
     // Connect to socket server
-    socketRef.current = io('http://localhost:4000', {
+    socketRef.current = io(process.env.NEXT_PUBLIC_WEBSOCKET_SERVER_URL, {
       transports: ['websocket'],
       forceNew: true
     });
-    socketChatRef.current = io('http://localhost:4001', {
+    socketChatRef.current = io(process.env.NEXT_PUBLIC_WEBSOCKET_CHAT_URL, {
       transports: ['websocket'],
       forceNew: true
     })
