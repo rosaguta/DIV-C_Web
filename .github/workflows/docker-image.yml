@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: div-c-web
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
