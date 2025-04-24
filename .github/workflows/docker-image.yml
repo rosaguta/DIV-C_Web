@@ -13,6 +13,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: create .env
+      run: |
+        echo {{ secrets.ENDPOINT_ENV }} > .env
+        
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag harbor.divsphere.net/rose/div-c_web:latest
 
