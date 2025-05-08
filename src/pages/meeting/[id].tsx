@@ -62,7 +62,7 @@ const Room = () => {
       socketChatRef.current.emit('join', roomName)
       socketChatRef.current.emit('messages', roomName)
     })
-    socketChatRef.current.on('message', handleChatMessage)
+    socketChatRef.current.on('messageHistory', handleChatMessage)
 
 
     console.log('Connecting to socket server...');
@@ -484,7 +484,6 @@ const Room = () => {
   const sendChat = (event) => {
     event.preventDefault();
     console.log("Sending message:", input);
-    socketChatRef.current.emit('message', input, roomName);
     socketChatRef.current.emit('message', input, roomName);
     setInput("");
   };
